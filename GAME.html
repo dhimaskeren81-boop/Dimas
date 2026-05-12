@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Cube Dodger 3D</title>
+  <style>
+    body { margin: 0; background: #000; overflow: hidden; font-family: monospace; }
+    canvas { display: block; }
+    #ui { position: absolute; top: 20px; width: 100%; text-align: center; color: #0f0; z-index: 100; }
+    #info { font-size: 24px; text-shadow: 0 0 10px #0f0; }
+    #skor { font-size: 18px; }
+  </style>
+  <script async src="https://unpkg.com/es-module-shims@1.8.0/dist/es-module-shims.js"></script>
+  <script type="importmap">
+  { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
+  </script>
+</head>
+<body>
+  <div id="ui">
+    <div id="info">🎮 TAP KIRI/KANAN BUAT GERAK 🎮</div>
+    <div id="skor">Skor: 0</div>
+  </div>
+
+  <script type="module">
+    import * as THREE from 'three';
+
+    // 1. SETUP DASAR
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer({antialias: true});
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+
+    // 2. LAMPU BIAR GAK GELAP
+    const light = new THREE.DirectionalLight(0xffffff, 1);
+    light.position.set(5, 10, 5);
+    scene.add(light);
+    scene.add(new THREE.AmbientLight(0x404040));
+
+    // 3. PLAYER = KUBUS IJO
+    const playerGeo = new THREE.BoxGeometry(1, 1, 1);
+    const playerMat = new THREE.MeshPhongMaterial({color: 0x00ff00});
+    const player = new THREE.Mesh(playerGeo, playerMat);
+    player.position.y = 0.5;
+    scene.add(player);
+
+    // 4. LANTAI
+    const lantaiGeo = new THREE.BoxGeometry(10, 0.2, 1000);
+    const lantaiMat = new THREE.MeshPhongMaterial({color: 0x111111});
+    const lantai = new THREE.Mesh(lantaiGeo, lantaiMat);
+    scene.add(lantai);
+
+    // 5. KAMERA NGIKUTIN PLAYER
+    camera.position.set(0, 5, 10);
+    camera.lookAt(player.position);
+
+    // 6. MUSUH KUBUS MERAH
+    let musuh = [];
+    let skor = 0;
+    let speed = 0.15;
+    let gameOver = false;
+
+    function spawnMusuh() {
+      if(gameOver) return;
+      const musuhGeo = new THREE.BoxGeometry(1, 1, 1);
+      const musuhMat = new THREE.MeshPhongMaterial({color: 0xff0000});
+      const m = new THREE.Mesh(musuhGeo, musuhMat);
+      m.position.set(Math.random() * 8 - 4, 0.5, player.position.z - 50);
+      scene.add(m);
+      musuh.push(m);
+    }
+    setInterval(spawnMusuh, 800);
+
+    // 7. KONTROL TAP KIRI/KANAN
+    let playerX = 0;
+    document.addEventListener('touchstart', (e) => {
+      if(gameOver) {
+        location.reload();
+        return;
+      }
+      let x = e.touches[0].clientX;
+      if(x < window.innerWidth / 2) {
+        playerX = Math.max(playerX - 2, -4); // Kiri
+      } else {
+        playerX = Math.min(playerX + 2, 4); // Kanan
+      }
+    });
+
+    // Buat PC: pake A dan D
+    document.addEventListener('keydown', (e) => {
+      if(e.key === 'a' || e.key === 'ArrowLeft') playerX = Math.max(playerX - 2, -4);
+      if(e.key === 'd' || e.key === 'ArrowRight') playerX = Math.min(playerX + 2, 4);
+      if(gameOver && e.key === ' ') location.reload();
+    });
+
+    // 8. GAME LOOP
+    function animate() {
+      if(gameOver) {
+        document.getElementById('info').innerHTML = 'GAME OVER 😭 TAP BUAT ULANG';
+        return;
+      }
+
+      requestAnimationFrame(animate);
+
+      // Player jalan maju terus
+      player.position.z -= speed;
+      player.position.x += (playerX - player.position.x) * 0.1;
+
+      // Kamera ngikutin
+      camera.position.z = player.position.z + 10;
+      camera.lookAt(player.position.x, 0, player.position.z - 5);
+
+      // Cek nabrak musuh
+      for(let i = musuh.length - 1; i >= 0; i--) {
+        let m = musuh[i];
+        // Kalo musuh kelewat, hapus + tambah skor
+        if(m.position.z > player.position.z + 5) {
+          scene.remove(m);
+          musuh.splice(i, 1);
+          skor++;
+          speed += 0.002; // Makin cepet
+          document.getElementById('skor').innerHTML = 'Skor: ' + skor;
+        }
+        // Kalo nabrak
+        if(Math.abs(m.position.x - player.position.x) < 1 && Math.abs(m.position.z - player.position.z) < 1) {
+          gameOver = true;
+        }
+      }
+
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    // Resize layar
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+  </script>
+</body>
+</html>
