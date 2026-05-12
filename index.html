@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>Cube Dodger 3D</title>
+  <title>Car Dodge 3D</title>
   <style>
     body { margin: 0; background: #000; overflow: hidden; font-family: monospace; }
     canvas { display: block; }
@@ -18,126 +18,49 @@
 </head>
 <body>
   <div id="ui">
-    <div id="info">🎮 TAP KIRI/KANAN BUAT GERAK 🎮</div>
+    <div id="info">🚗 TAP KIRI/KANAN BUAT NYETIR 🚗</div>
     <div id="skor">Skor: 0</div>
   </div>
 
   <script type="module">
     import * as THREE from 'three';
 
-    // 1. SETUP DASAR
+    // 1. SETUP DASAR + BAYANGAN
     const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x87CEEB); // Langit biru
     const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
     const renderer = new THREE.WebGLRenderer({antialias: true});
     renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = true; // BAYANGAN ON
     document.body.appendChild(renderer.domElement);
 
-    // 2. LAMPU BIAR GAK GELAP
-    const light = new THREE.DirectionalLight(0xffffff, 1);
+    // 2. LAMPU + BAYANGAN
+    const light = new THREE.DirectionalLight(0xffffff, 1.2);
     light.position.set(5, 10, 5);
+    light.castShadow = true;
+    light.shadow.mapSize.width = 2048;
+    light.shadow.mapSize.height = 2048;
     scene.add(light);
     scene.add(new THREE.AmbientLight(0x404040));
 
-    // 3. PLAYER = KUBUS IJO
-    const playerGeo = new THREE.BoxGeometry(1, 1, 1);
-    const playerMat = new THREE.MeshPhongMaterial({color: 0x00ff00});
-    const player = new THREE.Mesh(playerGeo, playerMat);
-    player.position.y = 0.5;
-    scene.add(player);
+    // 3. BIKIN MOBIL FUNCTION
+    function createCar(color, isPlayer = false) {
+      const car = new THREE.Group();
 
-    // 4. LANTAI
-    const lantaiGeo = new THREE.BoxGeometry(10, 0.2, 1000);
-    const lantaiMat = new THREE.MeshPhongMaterial({color: 0x111111});
-    const lantai = new THREE.Mesh(lantaiGeo, lantaiMat);
-    scene.add(lantai);
+      // Body mobil
+      const bodyGeo = new THREE.BoxGeometry(2, 0.6, 1);
+      const bodyMat = new THREE.MeshStandardMaterial({ color: color });
+      const body = new THREE.Mesh(bodyGeo, bodyMat);
+      body.position.y = 0.4;
+      body.castShadow = true;
+      car.add(body);
 
-    // 5. KAMERA NGIKUTIN PLAYER
-    camera.position.set(0, 5, 10);
-    camera.lookAt(player.position);
+      // Kabin
+      const cabinGeo = new THREE.BoxGeometry(1, 0.5, 0.8);
+      const cabinMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
+      const cabin = new THREE.Mesh(cabinGeo, cabinMat);
+      cabin.position.set(isPlayer ? -0.2 : 0.2, 0.95, 0);
+      cabin.castShadow = true;
+      car.add(cabin);
 
-    // 6. MUSUH KUBUS MERAH
-    let musuh = [];
-    let skor = 0;
-    let speed = 0.15;
-    let gameOver = false;
-
-    function spawnMusuh() {
-      if(gameOver) return;
-      const musuhGeo = new THREE.BoxGeometry(1, 1, 1);
-      const musuhMat = new THREE.MeshPhongMaterial({color: 0xff0000});
-      const m = new THREE.Mesh(musuhGeo, musuhMat);
-      m.position.set(Math.random() * 8 - 4, 0.5, player.position.z - 50);
-      scene.add(m);
-      musuh.push(m);
-    }
-    setInterval(spawnMusuh, 800);
-
-    // 7. KONTROL TAP KIRI/KANAN
-    let playerX = 0;
-    document.addEventListener('touchstart', (e) => {
-      if(gameOver) {
-        location.reload();
-        return;
-      }
-      let x = e.touches[0].clientX;
-      if(x < window.innerWidth / 2) {
-        playerX = Math.max(playerX - 2, -4); // Kiri
-      } else {
-        playerX = Math.min(playerX + 2, 4); // Kanan
-      }
-    });
-
-    // Buat PC: pake A dan D
-    document.addEventListener('keydown', (e) => {
-      if(e.key === 'a' || e.key === 'ArrowLeft') playerX = Math.max(playerX - 2, -4);
-      if(e.key === 'd' || e.key === 'ArrowRight') playerX = Math.min(playerX + 2, 4);
-      if(gameOver && e.key === ' ') location.reload();
-    });
-
-    // 8. GAME LOOP
-    function animate() {
-      if(gameOver) {
-        document.getElementById('info').innerHTML = 'GAME OVER 😭 TAP BUAT ULANG';
-        return;
-      }
-
-      requestAnimationFrame(animate);
-
-      // Player jalan maju terus
-      player.position.z -= speed;
-      player.position.x += (playerX - player.position.x) * 0.1;
-
-      // Kamera ngikutin
-      camera.position.z = player.position.z + 10;
-      camera.lookAt(player.position.x, 0, player.position.z - 5);
-
-      // Cek nabrak musuh
-      for(let i = musuh.length - 1; i >= 0; i--) {
-        let m = musuh[i];
-        // Kalo musuh kelewat, hapus + tambah skor
-        if(m.position.z > player.position.z + 5) {
-          scene.remove(m);
-          musuh.splice(i, 1);
-          skor++;
-          speed += 0.002; // Makin cepet
-          document.getElementById('skor').innerHTML = 'Skor: ' + skor;
-        }
-        // Kalo nabrak
-        if(Math.abs(m.position.x - player.position.x) < 1 && Math.abs(m.position.z - player.position.z) < 1) {
-          gameOver = true;
-        }
-      }
-
-      renderer.render(scene, camera);
-    }
-    animate();
-
-    // Resize layar
-    window.addEventListener('resize', () => {
-      camera.aspect = window.innerWidth / window.innerHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(window.innerWidth, window.innerHeight);
-    });
-  </script>
-</body>
-</html>
+      // Roda 4 bij
